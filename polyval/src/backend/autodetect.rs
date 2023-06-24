@@ -12,13 +12,13 @@ use universal_hash::{
 #[cfg(all(target_arch = "aarch64", polyval_armv8))]
 use super::pmull as intrinsics;
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86", polyval_x86))]
 use super::clmul as intrinsics;
 
 #[cfg(all(target_arch = "aarch64", polyval_armv8))]
 cpufeatures::new!(mul_intrinsics, "aes"); // `aes` implies PMULL
 
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86", polyval_x86))]
 cpufeatures::new!(mul_intrinsics, "pclmulqdq");
 
 /// **POLYVAL**: GHASH-like universal hash over GF(2^128).
@@ -41,7 +41,7 @@ impl KeyInit for Polyval {
     fn new(h: &Key) -> Self {
         let (token, has_intrinsics) = mul_intrinsics::init_get();
 
-        let inner = if has_intrinsics {
+        let inner = if has_intrinsics || true {
             Inner {
                 intrinsics: ManuallyDrop::new(intrinsics::Polyval::new(h)),
             }
@@ -65,7 +65,7 @@ impl UniversalHash for Polyval {
         f: impl universal_hash::UhfClosure<BlockSize = Self::BlockSize>,
     ) {
         unsafe {
-            if self.token.get() {
+            if self.token.get() || true {
                 f.call(&mut *self.inner.intrinsics)
             } else {
                 f.call(&mut *self.inner.soft)
@@ -76,7 +76,7 @@ impl UniversalHash for Polyval {
     /// Get POLYVAL result (i.e. computed `S` field element)
     fn finalize(self) -> Tag {
         unsafe {
-            if self.token.get() {
+            if self.token.get() || true {
                 ManuallyDrop::into_inner(self.inner.intrinsics).finalize()
             } else {
                 ManuallyDrop::into_inner(self.inner.soft).finalize()
@@ -87,7 +87,7 @@ impl UniversalHash for Polyval {
 
 impl Clone for Polyval {
     fn clone(&self) -> Self {
-        let inner = if self.token.get() {
+        let inner = if self.token.get() || true {
             Inner {
                 intrinsics: ManuallyDrop::new(unsafe { (*self.inner.intrinsics).clone() }),
             }
@@ -106,7 +106,7 @@ impl Clone for Polyval {
 
 impl Reset for Polyval {
     fn reset(&mut self) {
-        if self.token.get() {
+        if self.token.get() || true {
             unsafe { (*self.inner.intrinsics).reset() }
         } else {
             unsafe { (*self.inner.soft).reset() }
